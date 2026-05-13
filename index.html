@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Makhraj Huruf 3D Interaktif | KhairNgajiCo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; }
+        #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* Custom Scrollbar for sidebar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: rgba(30, 41, 59, 0.5); }
+        ::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.8); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(79, 70, 229, 1); }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .makhraj-btn {
+            transition: all 0.3s ease;
+            border: 1px solid transparent;
+        }
+        .makhraj-btn:hover {
+            transform: translateX(5px);
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.2);
+        }
+        .makhraj-btn.active {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 0 15px rgba(99, 102, 241, 0.3);
+        }
+        
+        .letter-btn {
+            transition: all 0.2s ease;
+        }
+        .letter-btn:hover {
+            transform: scale(1.1);
+            background: #4f46e5;
+        }
+        .letter-btn.active {
+            background: #4f46e5;
+            box-shadow: 0 0 10px #4f46e5;
+            border-color: white;
+        }
+
+        #loading-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .loader {
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid #6366f1;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Floating animation for logo */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .brand-logo { animation: float 3s ease-in-out infinite; }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <div class="loader mb-4"></div>
+        <h2 class="text-2xl font-bold text-indigo-400">Memuatkan Simulasi 3D...</h2>
+        <p class="text-gray-400 mt-2">KhairNgajiCo Interactive</p>
+    </div>
+
+    <!-- 3D Canvas -->
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        
+        <!-- Header -->
+        <header class="p-4 md:p-6 flex justify-between items-start pointer-events-auto">
+            <div class="glass-panel p-4 rounded-xl shadow-lg border-indigo-500/30 border-t-2 border-l-2">
+                <h1 class="text-2xl md:text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400 brand-logo">
+                    KhairNgajiCo.
+                </h1>
+                <p class="text-xs text-gray-300 mt-1 uppercase tracking-widest font-semibold">Simulasi Makhraj 3D</p>
+            </div>
+            
+            <!-- Controls Hint -->
+            <div class="glass-panel px-4 py-2 rounded-lg text-sm hidden md:flex items-center gap-3">
+                <span class="flex items-center gap-1"><span class="bg-gray-700 px-2 rounded text-xs">Klik Kiri</span> Putar</span>
+                <span class="flex items-center gap-1"><span class="bg-gray-700 px-2 rounded text-xs">Skrol</span> Zum</span>
+                <span class="flex items-center gap-1"><span class="bg-gray-700 px-2 rounded text-xs">Klik Kanan</span> Gerak</span>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col md:flex-row overflow-hidden pb-4 px-4 md:px-6 gap-4">
+            
+            <!-- Sidebar: Makhraj Categories -->
+            <aside class="w-full md:w-80 flex flex-col gap-3 pointer-events-auto shrink-0 z-20">
+                <div class="glass-panel p-4 rounded-xl flex-1 flex flex-col h-full shadow-2xl">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2 border-b border-gray-600 pb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                        5 Tempat Makhraj
+                    </h2>
+                    
+                    <div class="overflow-y-auto pr-2 flex-1 space-y-2" id="category-container">
+                        <!-- Categories will be generated by JS -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Bottom/Right Panel: Detail & Letters -->
+            <main class="flex-1 flex flex-col justify-end items-end pointer-events-none gap-4">
+                
+                <!-- Explanation Panel -->
+                <div id="info-panel" class="glass-panel w-full md:max-w-xl p-5 md:p-6 rounded-2xl shadow-2xl pointer-events-auto transform transition-all duration-500 translate-y-10 opacity-0">
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 id="info-title" class="text-2xl font-bold text-cyan-300 arabic-font">Sila Pilih Makhraj</h3>
+                        <span id="info-arabic" class="text-3xl text-indigo-300" style="font-family: 'Traditional Arabic', serif;"></span>
+                    </div>
+                    
+                    <p id="info-desc" class="text-gray-300 leading-relaxed mb-4">
+                        Pilih salah satu tempat makhraj di menu sebelah kiri untuk melihat visualisasi 3D dan senarai huruf yang berkaitan.
+                    </p>
+
+                    <div id="letters-container" class="hidden">
+                        <h4 class="text-sm uppercase tracking-wider text-gray-400 mb-2 font-semibold">Huruf-huruf:</h4>
+                        <div id="letters-grid" class="flex flex-wrap gap-2">
+                            <!-- Letters generated by JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Specific Letter Detail -->
+                    <div id="letter-detail" class="mt-4 p-3 bg-indigo-900/40 rounded-lg border border-indigo-500/30 hidden">
+                        <h5 id="detail-letter" class="text-xl font-bold text-yellow-400 mb-1" style="font-family: 'Traditional Arabic', serif;"></h5>
+                        <p id="detail-desc" class="text-sm text-gray-300"></p>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA MAKHRAJ ---
+        const makhrajData = [
+            {
+                id: 'jawf',
+                name: 'Al-Jawf (Rongga Mulut)',
+                arabic: 'الجوف',
+                color: 0x3b82f6, // Blue
+                desc: 'Rongga yang merangkumi dari dada, tekak hingga ke mulut. Ia adalah makhraj bagi huruf-huruf Mad (panjang). Bunyi keluar mengalir tanpa sekatan.',
+                letters: [
+                    { char: 'ا', name: 'Alif', detail: 'Alif yang didahului baris atas (Fathah).' },
+                    { char: 'و', name: 'Waw', detail: 'Waw mati yang didahului baris hadapan (Dhommah).' },
+                    { char: 'ي', name: 'Ya', detail: 'Ya mati yang didahului baris bawah (Kasrah).' }
+                ],
+                cameraPos: { x: 5, y: 0, z: 8 },
+                targetPos: { x: 0, y: 0, z: -2 }
+            },
+            {
+                id: 'halq',
+                name: 'Al-Halq (Kerongkong/Tekak)',
+                arabic: 'الحلق',
+                color: 0xef4444, // Red
+                desc: 'Bahagian tekak. Terbahagi kepada 3 bahagian: Pangkal Tekak (paling dalam), Tengah Tekak, dan Hujung Tekak (paling atas berhampiran anak tekak).',
+                letters: [
+                    { char: 'ء', name: 'Hamzah', detail: 'Pangkal tekak (Aqsal Halq).' },
+                    { char: 'هـ', name: 'Ha', detail: 'Pangkal tekak (Aqsal Halq).' },
+                    { char: 'ع', name: 'Ain', detail: 'Tengah tekak (Wasatul Halq).' },
+                    { char: 'ح', name: 'Ha (Pedas)', detail: 'Tengah tekak (Wasatul Halq).' },
+                    { char: 'غ', name: 'Ghoin', detail: 'Hujung tekak (Adnal Halq).' },
+                    { char: 'خ', name: 'Kho', detail: 'Hujung tekak (Adnal Halq).' }
+                ],
+                cameraPos: { x: 0, y: -2, z: 10 },
+                targetPos: { x: 0, y: -3, z: -3 }
+            },
+            {
+                id: 'lisan',
+                name: 'Al-Lisan (Lidah)',
+                arabic: 'اللسان',
+                color: 0x10b981, // Green
+                desc: 'Makhraj yang paling banyak huruf. Melibatkan bahagian pangkal lidah, tengah lidah, tepi lidah dan hujung lidah yang bersentuhan dengan lelangit atau gigi.',
+                letters: [
+                    { char: 'ق', name: 'Qof', detail: 'Pangkal lidah menyentuh lelangit lembut (atas).' },
+                    { char: 'ك', name: 'Kaf', detail: 'Pangkal lidah menyentuh lelangit keras (sedikit ke depan dari Qof).' },
+                    { char: 'ج', name: 'Jim', detail: 'Tengah lidah menyentuh lelangit atas.' },
+                    { char: 'ش', name: 'Syin', detail: 'Tengah lidah menyentuh lelangit atas.' },
+                    { char: 'ي', name: 'Ya (Bukan Mad)', detail: 'Tengah lidah menyentuh lelangit atas.' },
+                    { char: 'ض', name: 'Dhod', detail: 'Tepi lidah menyentuh gusi geraham atas.' },
+                    { char: 'ل', name: 'Lam', detail: 'Hujung lidah menyentuh gusi gigi depan atas.' },
+                    { char: 'ن', name: 'Nun', detail: 'Hujung lidah menyentuh gusi atas (bawah sedikit dari Lam).' },
+                    { char: 'ر', name: 'Ro', detail: 'Hujung lidah menyentuh gusi atas, berhampiran makhraj Nun tetapi dilenturkan ke belakang.' },
+                    { char: 'ط', name: 'Tho', detail: 'Hujung lidah menyentuh pangkal gigi kacip atas.' },
+                    { char: 'د', name: 'Dal', detail: 'Hujung lidah menyentuh pangkal gigi kacip atas.' },
+                    { char: 'ت', name: 'Ta', detail: 'Hujung lidah menyentuh pangkal gigi kacip atas.' },
+                    { char: 'ص', name: 'Sod', detail: 'Hujung lidah hampir menyentuh gigi kacip bawah (bunyi keluar dari celah).' },
+                    { char: 'س', name: 'Sin', detail: 'Hujung lidah hampir menyentuh gigi kacip bawah.' },
+                    { char: 'ز', name: 'Zai', detail: 'Hujung lidah hampir menyentuh gigi kacip bawah.' },
+                    { char: 'ظ', name: 'Zho', detail: 'Hujung lidah dikeluarkan sedikit menyentuh hujung gigi kacip atas.' },
+                    { char: 'ذ', name: 'Zal', detail: 'Hujung lidah dikeluarkan sedikit menyentuh hujung gigi kacip atas.' },
+                    { char: 'ث', name: 'Tha', detail: 'Hujung lidah dikeluarkan sedikit menyentuh hujung gigi kacip atas.' }
+                ],
+                cameraPos: { x: 6, y: 1, z: 6 },
+                targetPos: { x: 0, y: 0, z: 2 }
+            },
+            {
+                id: 'shafatain',
+                name: 'Asy-Syafatain (Dua Bibir)',
+                arabic: 'الشفتان',
+                color: 0xf59e0b, // Yellow
+                desc: 'Melibatkan pergerakan atau pertemuan bibir atas dan bibir bawah.',
+                letters: [
+                    { char: 'ف', name: 'Fa', detail: 'Perut bibir bawah menyentuh hujung gigi kacip atas.' },
+                    { char: 'و', name: 'Waw (Bukan Mad)', detail: 'Membulatkan kedua-dua bibir ke hadapan.' },
+                    { char: 'ب', name: 'Ba', detail: 'Merapatkan kedua-dua bibir (bahagian basah/dalam).' },
+                    { char: 'م', name: 'Mim', detail: 'Meraba kedua-dua bibir (bahagian kering/luar).' }
+                ],
+                cameraPos: { x: 0, y: 0, z: 12 },
+                targetPos: { x: 0, y: 0, z: 4 }
+            },
+            {
+                id: 'khaishum',
+                name: 'Al-Khaisyum (Pangkal Hidung)',
+                arabic: 'الخيشوم',
+                color: 0xa855f7, // Purple
+                desc: 'Rongga hidung. Ia adalah tempat keluarnya bunyi dengung (Ghunnah). Tiada huruf khusus, tetapi sifat dengung terhasil di sini bagi huruf Mim dan Nun.',
+                letters: [
+                    { char: 'مّ', name: 'Mim Syaddah', detail: 'Dengung 2 harakat di pangkal hidung.' },
+                    { char: 'نّ', name: 'Nun Syaddah', detail: 'Dengung 2 harakat di pangkal hidung.' }
+                ],
+                cameraPos: { x: -3, y: 4, z: 8 },
+                targetPos: { x: 0, y: 3, z: 0 }
+            }
+        ];
+
+        // --- 3D SETUP ---
+        let scene, camera, renderer, controls;
+        let mouthGroup, parts = {};
+        
+        function init3D() {
+            const container = document.getElementById('canvas-container');
+            
+            scene = new THREE.Scene();
+            // Background color matches CSS
+            scene.background = new THREE.Color(0x0f172a); 
+            scene.fog = new THREE.FogExp2(0x0f172a, 0.02);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(8, 2, 12);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxDistance = 25;
+            controls.minDistance = 3;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 10, 10);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+
+            const fillLight = new THREE.DirectionalLight(0x6366f1, 0.5); // Indigo tint
+            fillLight.position.set(-10, 0, -10);
+            scene.add(fillLight);
+
+            createAbstractMouthModel();
+
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.opacity = '0';
+                setTimeout(() => document.getElementById('loading-screen').style.display = 'none', 500);
+            }, 1000);
+
+            animate();
+        }
+
+        function createAbstractMouthModel() {
+            mouthGroup = new THREE.Group();
+            scene.add(mouthGroup);
+
+            // Helper to create glossy materials
+            const createMat = (color, opacity = 1, transparent = false) => {
+                return new THREE.MeshPhysicalMaterial({
+                    color: color,
+                    metalness: 0.1,
+                    roughness: 0.4,
+                    clearcoat: 0.8,
+                    clearcoatRoughness: 0.2,
+                    transparent: transparent,
+                    opacity: opacity,
+                    side: THREE.DoubleSide
+                });
+            };
+
+            // 1. Rongga (Jawf) - Abstract container
+            const jawfGeo = new THREE.CylinderGeometry(2, 3, 8, 32, 1, true);
+            const jawfMat = createMat(0x1e293b, 0.3, true); // Semi transparent dark blue
+            parts.jawf = new THREE.Mesh(jawfGeo, jawfMat);
+            parts.jawf.rotation.x = Math.PI / 2;
+            parts.jawf.position.set(0, 0, -2);
+            mouthGroup.add(parts.jawf);
+
+            // 2. Tekak (Halq) - Tube at the back
+            const halqGeo = new THREE.CylinderGeometry(1.5, 1.5, 5, 32);
+            const halqMat = createMat(0x991b1b, 0.8, true); // Reddish
+            parts.halq = new THREE.Mesh(halqGeo, halqMat);
+            parts.halq.position.set(0, -3.5, -4);
+            mouthGroup.add(parts.halq);
+
+            // 3. Lidah (Lisan) - Curved shape
+            const lisanCurve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, -1, -3), // Pangkal
+                new THREE.Vector3(0, -0.5, 0), // Tengah
+                new THREE.Vector3(0, 0, 2.5)   // Hujung
+            ]);
+            const lisanGeo = new THREE.TubeGeometry(lisanCurve, 20, 1.2, 16, false);
+            // Flatten the tube to look more like a tongue
+            lisanGeo.scale(1, 0.4, 1);
+            const lisanMat = createMat(0xec4899); // Pink
+            parts.lisan = new THREE.Mesh(lisanGeo, lisanMat);
+            parts.lisan.castShadow = true;
+            mouthGroup.add(parts.lisan);
+
+            // Gigi (Teeth for reference)
+            parts.teeth = new THREE.Group();
+            const toothGeo = new THREE.BoxGeometry(0.3, 0.6, 0.3);
+            const toothMat = createMat(0xf8fafc); // White
+            
+            // Upper teeth curve
+            for(let i = -5; i <= 5; i++) {
+                const angle = (i * 15) * (Math.PI / 180);
+                const radius = 2.8;
+                const tooth = new THREE.Mesh(toothGeo, toothMat);
+                tooth.position.set(Math.sin(angle) * radius, 0.8, Math.cos(angle) * radius + 1);
+                tooth.rotation.y = angle;
+                parts.teeth.add(tooth);
+            }
+            // Lower teeth curve
+            for(let i = -5; i <= 5; i++) {
+                const angle = (i * 15) * (Math.PI / 180);
+                const radius = 2.6;
+                const tooth = new THREE.Mesh(toothGeo, toothMat);
+                tooth.position.set(Math.sin(angle) * radius, -0.5, Math.cos(angle) * radius + 1.2);
+                tooth.rotation.y = angle;
+                parts.teeth.add(tooth);
+            }
+            mouthGroup.add(parts.teeth);
+
+            // 4. Bibir (Shafatain) - Torus segments
+            parts.shafatain = new THREE.Group();
+            const lipMat = createMat(0xe11d48); // Rose red
+            
+            // Upper lip
+            const upperLipGeo = new THREE.TorusGeometry(3, 0.4, 16, 32, Math.PI);
+            const upperLip = new THREE.Mesh(upperLipGeo, lipMat);
+            upperLip.position.set(0, 0.6, 3.8);
+            upperLip.rotation.x = Math.PI / 2;
+            parts.shafatain.add(upperLip);
+
+            // Lower lip
+            const lowerLipGeo = new THREE.TorusGeometry(3, 0.4, 16, 32, Math.PI);
+            const lowerLip = new THREE.Mesh(lowerLipGeo, lipMat);
+            lowerLip.position.set(0, -0.2, 3.8);
+            lowerLip.rotation.x = -Math.PI / 2;
+            parts.shafatain.add(lowerLip);
+
+            mouthGroup.add(parts.shafatain);
+
+            // 5. Hidung (Khaishum) - Cavity above
+            const khaishumGeo = new THREE.SphereGeometry(1.5, 32, 16, 0, Math.PI);
+            const khaishumMat = createMat(0x7c3aed, 0.6, true); // Purple
+            parts.khaishum = new THREE.Mesh(khaishumGeo, khaishumMat);
+            parts.khaishum.position.set(0, 3, 1);
+            parts.khaishum.rotation.x = -Math.PI / 2;
+            mouthGroup.add(parts.khaishum);
+            
+            // Add slight floating animation to the whole group
+            new TWEEN.Tween(mouthGroup.position)
+                .to({ y: 0.2 }, 2000)
+                .easing(TWEEN.Easing.Quadratic.InOut)
+                .yoyo(true)
+                .repeat(Infinity)
+                .start();
+        }
+
+        let currentAnimation = null;
+        let originalLisanPos = null;
+        let originalLipsPos = null;
+
+        function animateMakhrajAction(categoryId, letterChar = null) {
+            // Reset previous animations
+            if (currentAnimation) currentAnimation.stop();
+            TWEEN.removeAll();
+            
+            // Reset parts to default opacity and color
+            Object.values(parts).forEach(part => {
+                if(part.material) {
+                    part.material.emissive = new THREE.Color(0x000000);
+                    if(part !== parts.jawf && part !== parts.halq && part !== parts.khaishum) {
+                        part.material.opacity = 1;
+                    }
+                }
+            });
+            // Reset children of groups
+            if(parts.shafatain) parts.shafatain.children.forEach(c => { c.material.emissive = new THREE.Color(0x000000); c.position.y = c.userData.origY || c.position.y; });
+            if(parts.lisan) { parts.lisan.position.set(0,0,0); parts.lisan.rotation.set(0,0,0); }
+
+            // Highlight chosen category
+            const data = makhrajData.find(d => d.id === categoryId);
+            if (!data) return;
+
+            // Move Camera
+            new TWEEN.Tween(camera.position)
+                .to({ x: data.cameraPos.x, y: data.cameraPos.y, z: data.cameraPos.z }, 1500)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+            new TWEEN.Tween(controls.target)
+                .to({ x: data.targetPos.x, y: data.targetPos.y, z: data.targetPos.z }, 1500)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            // Dim others, glow target
+            Object.keys(parts).forEach(key => {
+                if (key !== categoryId && key !== 'teeth') {
+                    if(parts[key].material) parts[key].material.opacity = 0.2;
+                    if(parts[key].children) parts[key].children.forEach(c => c.material.opacity = 0.2);
+                }
+            });
+
+            // Specific Animations based on Letter or Category
+            if (categoryId === 'shafatain') {
+                parts.shafatain.children.forEach(c => { 
+                    c.material.opacity = 1; 
+                    c.material.emissive = new THREE.Color(data.color);
+                    c.material.emissiveIntensity = 0.5;
+                });
+                
+                // Save original positions if not saved
+                if(!parts.shafatain.children[0].userData.origY) {
+                    parts.shafatain.children[0].userData.origY = parts.shafatain.children[0].position.y;
+                    parts.shafatain.children[1].userData.origY = parts.shafatain.children[1].position.y;
+                }
+
+                if (letterChar === 'ب' || letterChar === 'م' || !letterChar) {
+                    // Animate lips closing (Ba, Mim)
+                    const upperLip = parts.shafatain.children[0];
+                    const lowerLip = parts.shafatain.children[1];
+                    
+                    const closeTween = new TWEEN.Tween({u: upperLip.position.y, l: lowerLip.position.y})
+                        .to({u: 0.3, l: 0.1}, 500)
+                        .easing(TWEEN.Easing.Quadratic.InOut)
+                        .onUpdate((obj) => {
+                            upperLip.position.y = obj.u;
+                            lowerLip.position.y = obj.l;
+                        });
+                    
+                    const openTween = new TWEEN.Tween({u: 0.3, l: 0.1})
+                        .to({u: upperLip.userData.origY, l: lowerLip.userData.origY}, 500)
+                        .easing(TWEEN.Easing.Quadratic.InOut)
+                        .onUpdate((obj) => {
+                            upperLip.position.y = obj.u;
+                            lowerLip.position.y = obj.l;
+                        });
+
+                    closeTween.chain(openTween);
+                    openTween.chain(closeTween);
+                    closeTween.start();
+                } 
+                else if (letterChar === 'و') {
+                    // Waw - Bulatkan bibir (Scale down X, push forward Z)
+                    // Simplified representation for abstract model
+                    new TWEEN.Tween(parts.shafatain.scale)
+                        .to({x: 0.6, y: 1.2, z: 1.2}, 500).yoyo(true).repeat(Infinity).start();
+                }
+            } 
+            else if (categoryId === 'lisan') {
+                parts.lisan.material.opacity = 1;
+                parts.lisan.material.emissive = new THREE.Color(data.color);
+                parts.lisan.material.emissiveIntensity = 0.5;
+
+                // Simple tongue animations based on letter type
+                if (letterChar) {
+                    let moveY = 0, moveZ = 0, rotX = 0;
+                    
+                    // Hujung lidah (e.g. Ta, Dal, Tho)
+                    if(['ت','د','ط','ل','ن','ر'].includes(letterChar)) {
+                        moveY = 0.5; moveZ = 1; rotX = 0.2;
+                    } 
+                    // Pangkal/Tengah (e.g. Qof, Kaf, Jim)
+                    else if(['ق','ك','ج','ش','ي'].includes(letterChar)) {
+                        moveY = 0.8; moveZ = -1; rotX = -0.2;
+                    }
+
+                    new TWEEN.Tween(parts.lisan.position)
+                        .to({y: moveY, z: moveZ}, 600).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+                    new TWEEN.Tween(parts.lisan.rotation)
+                        .to({x: rotX}, 600).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+                } else {
+                    // Generic tongue wag
+                    new TWEEN.Tween(parts.lisan.position)
+                        .to({y: 0.3}, 1000).easing(TWEEN.Easing.Quadratic.InOut).yoyo(true).repeat(Infinity).start();
+                }
+            }
+            else if (parts[categoryId]) {
+                // Halq, Jawf, Khaishum
+                parts[categoryId].material.opacity = 0.8;
+                parts[categoryId].material.emissive = new THREE.Color(data.color);
+                parts[categoryId].material.emissiveIntensity = 0.5;
+                
+                // Pulsate effect to show air/sound flow
+                new TWEEN.Tween(parts[categoryId].material)
+                    .to({emissiveIntensity: 0.1}, 800)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .yoyo(true)
+                    .repeat(Infinity)
+                    .start();
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update(time);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function initUI() {
+            const container = document.getElementById('category-container');
+            const infoPanel = document.getElementById('info-panel');
+            const infoTitle = document.getElementById('info-title');
+            const infoArabic = document.getElementById('info-arabic');
+            const infoDesc = document.getElementById('info-desc');
+            const lettersContainer = document.getElementById('letters-container');
+            const lettersGrid = document.getElementById('letters-grid');
+            const letterDetail = document.getElementById('letter-detail');
+            const detailLetter = document.getElementById('detail-letter');
+            const detailDesc = document.getElementById('detail-desc');
+
+            makhrajData.forEach(data => {
+                const btn = document.createElement('button');
+                btn.className = 'makhraj-btn w-full text-left p-3 rounded-lg flex items-center justify-between group';
+                btn.innerHTML = `
+                    <div>
+                        <div class="font-bold text-gray-100 group-hover:text-white">${data.name}</div>
+                        <div class="text-xs text-gray-400 group-hover:text-gray-200 mt-1" style="font-family: 'Traditional Arabic', serif; font-size: 1.1rem;">${data.arabic}</div>
+                    </div>
+                    <div class="w-3 h-3 rounded-full" style="background-color: #${data.color.toString(16).padStart(6, '0')}"></div>
+                `;
+                
+                btn.onclick = () => {
+                    // Update UI state
+                    document.querySelectorAll('.makhraj-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Show Panel
+                    infoPanel.classList.remove('translate-y-10', 'opacity-0');
+                    infoTitle.textContent = data.name;
+                    infoArabic.textContent = data.arabic;
+                    infoDesc.textContent = data.desc;
+                    
+                    // Render Letters
+                    lettersGrid.innerHTML = '';
+                    if (data.letters.length > 0) {
+                        lettersContainer.classList.remove('hidden');
+                        data.letters.forEach(letter => {
+                            const lBtn = document.createElement('button');
+                            lBtn.className = 'letter-btn w-12 h-12 rounded-lg bg-gray-800 border border-gray-600 flex items-center justify-center text-2xl text-yellow-300 font-bold';
+                            lBtn.style.fontFamily = "'Traditional Arabic', serif";
+                            lBtn.textContent = letter.char;
+                            
+                            lBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                document.querySelectorAll('.letter-btn').forEach(b => b.classList.remove('active'));
+                                lBtn.classList.add('active');
+                                
+                                letterDetail.classList.remove('hidden');
+                                detailLetter.textContent = `${letter.char} - ${letter.name}`;
+                                detailDesc.textContent = letter.detail;
+                                
+                                // Trigger specific 3D animation for letter
+                                animateMakhrajAction(data.id, letter.char);
+                            };
+                            lettersGrid.appendChild(lBtn);
+                        });
+                    } else {
+                        lettersContainer.classList.add('hidden');
+                    }
+                    
+                    // Hide specific detail until a letter is clicked
+                    letterDetail.classList.add('hidden');
+
+                    // Trigger 3D Camera and Highlight for Category
+                    animateMakhrajAction(data.id);
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        // Initialize Everything
+        window.onload = function() {
+            init3D();
+            initUI();
+        };
+    </script>
+</body>
+</html>
